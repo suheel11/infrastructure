@@ -138,7 +138,7 @@ resource "aws_security_group" "database" {
 }
 
 resource "aws_s3_bucket" "webappBucket" {
-  bucket = "webapp.vvsuheel.vallamkonda"
+  bucket = "webapp.suheel.vallamkonda"
   acl = "private"
   force_destroy = true
   lifecycle_rule {
@@ -222,12 +222,16 @@ resource "aws_dynamodb_table" "csye6225" {
 data "aws_iam_policy_document" "policy" {
   statement {
     actions   = [
+      "s3:Get*",
+      "s3:List*",
       "s3:PutObject",
       "s3:GetObject",
       "s3:DeleteObject"
     ]
     effect= "Allow"
     resources = [
+      "arn:aws:s3:::${var.codedeploy_bucket}",
+      "arn:aws:s3:::${var.codedeploy_bucket}/*",
       "arn:aws:s3:::${aws_s3_bucket.webappBucket.bucket}",
       "arn:aws:s3:::${aws_s3_bucket.webappBucket.bucket}/*"
     ]
@@ -335,10 +339,10 @@ resource "aws_iam_policy" "CodeDeploy-EC2-S3" {
   EOF
 }
 
-resource "aws_iam_policy" "CircleCI-Upload-To-S3" {
-  name        = "CircleCI-Upload-To-S3"
+resource "aws_iam_policy" "GH-Upload-To-S3" {
+  name        = "GH-Upload-To-S3"
   path        = "/"
-  description = "Allows CircleCI to upload artifacts from latest successful build to dedicated S3 bucket used by code deploy"
+  description = "Allows GH actions to upload artifacts from build to S3 bucket used by code deploy"
   policy = <<EOF
 {
     "Version": "2012-10-17",
@@ -368,10 +372,10 @@ locals {
   user_account_id = "${data.aws_caller_identity.current.account_id}"
 }
 
-resource "aws_iam_policy" "CircleCI-Code-Deploy" {
-  name        = "CircleCI-Code-Deploy"
+resource "aws_iam_policy" "GH-Code-Deploy" {
+  name        = "GH-Code-Deploy"
   path        = "/"
-  description = "Allows CircleCI to call CodeDeploy APIs to initiate application deployment on EC2 instances"
+  description = "Allows gh actions to call CodeDeploy APIs to initiate application deployment on EC2 instances"
   policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -411,8 +415,8 @@ EOF
 
 
 
-resource "aws_iam_policy" "circleci-ec2-ami" {
-  name = "circleci-ec2-ami"
+resource "aws_iam_policy" "gh-ec2-ami" {
+  name = "gh-ec2-ami"
   path = "/"
   description = "This policy helps to avoid credentials"
   policy = <<EOF
@@ -515,17 +519,17 @@ resource "aws_iam_instance_profile" "deployment_profile" {
 
 resource "aws_iam_user_policy_attachment" "policy-attach-2" {
   user       = "cicd"
-  policy_arn = "${aws_iam_policy.circleci-ec2-ami.arn}"
+  policy_arn = "${aws_iam_policy.gh-ec2-ami.arn}"
 }
 
 resource "aws_iam_user_policy_attachment" "policy-attach-1" {
   user       = "cicd"
-  policy_arn = "${aws_iam_policy.CircleCI-Code-Deploy.arn}"
+  policy_arn = "${aws_iam_policy.GH-Code-Deploy.arn}"
 }
 
 resource "aws_iam_user_policy_attachment" "policy-attach" {
   user       = "cicd"
-  policy_arn = "${aws_iam_policy.CircleCI-Upload-To-S3.arn}"
+  policy_arn = "${aws_iam_policy.GH-Upload-To-S3.arn}"
 }
 
 resource "aws_iam_role_policy_attachment" "codedeploy_role_ec2role" {
@@ -553,33 +557,6 @@ resource "aws_sns_topic" "user_updates" {
   name = "user-updates-topic"
 }
 
-#resource "aws_launch_configuration" "asg_launch_config" {
-#  name                        = "asg_launch_config"
-#  image_id                    = var.ami
-#  key_name                    = var.keyPair
-#  instance_type               = "t2.micro"
-#  associate_public_ip_address = true
-
-#  user_data = <<-EOF
-#                #!/bin/bash
-#                sudo echo RDS_USERNAME=${aws_db_instance.csye6225.username} >> userdata.txt
-#                sudo echo RDS_DATABASE_NAME=${aws_db_instance.csye6225.name} >> userdata.txt
-#                sudo echo RDS_PASSWORD=${aws_db_instance.csye6225.password} >> userdata.txt
-#                sudo echo RDS_HOSTNAME=${aws_db_instance.csye6225.address} >> userdata.txt
-#                sudo echo S3_BUCKET_NAME=${aws_s3_bucket.webappBucket.bucket} >> userdata.txt
-#                sudo echo APPLICATION_ENV=dev >> userdata.txt
-#                sudo echo bucket=webapp.vvsuheel.vallamkonda >> userdata.txt
-#                sudo echo AWSAccessKeyId=${var.accessKey} >> userdata.txt
-#                sudo echo AWSSecretKey=${var.secretAccessKey} >> userdata.txt
-#                sudo echo TopicArn=${aws_sns_topic.user_updates.arn} >> userdata.txt
-#                chmod 765 userdata.txt
-#  EOF
-#  iam_instance_profile        = "${aws_iam_instance_profile.deployment_profile.name}"
-#  security_groups             = ["${aws_security_group.application.id}"]
-#}
-
-
-
 resource "aws_codedeploy_app" "csye6225-webapp" {
   compute_platform = "Server"
   name             = "csye6225-webapp"
@@ -596,7 +573,7 @@ resource "aws_codedeploy_deployment_group" "csye6225-webapp-deployment" {
     ec2_tag_filter {
       key   = "Name"
       type  = "KEY_AND_VALUE"
-      value = "Wep_App_Instance"
+      value = "Web App Instance"
     }
   }
 
@@ -604,4 +581,12 @@ resource "aws_codedeploy_deployment_group" "csye6225-webapp-deployment" {
     deployment_option = "WITHOUT_TRAFFIC_CONTROL"
     deployment_type = "IN_PLACE"
   }
+}
+
+resource "aws_route53_record" "www" {
+  name = var.dname
+  type = "A"
+  zone_id = var.zone_id
+  ttl = "60"
+  records = [aws_instance.web.public_ip]
 }
