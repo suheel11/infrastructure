@@ -543,7 +543,7 @@ resource "aws_iam_role_policy_attachment" "codedeploy_role_servicerole" {
 }
 
 resource "aws_iam_role_policy_attachment" "codedeploy_role2_ec2role" {
-  role       = "${aws_iam_role.CodeDeployEC2ServiceRole.name}"
+  role       = "${aws_iam_role.EC2_CSYE6225.name}"
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
 }
 
