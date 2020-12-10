@@ -746,15 +746,15 @@ resource "aws_security_group" "lb_security_grp" {
 
 
 
-resource "aws_lb_listener" "back_end" {
-  load_balancer_arn = aws_lb.LoadBalancer.arn
-  port              = "80"
-  protocol          = "HTTP"
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.lb_target_group_2.arn
-  }
-}
+# resource "aws_lb_listener" "back_end" {
+#   load_balancer_arn = aws_lb.LoadBalancer.arn
+#   port              = "80"
+#   protocol          = "HTTP"
+#   default_action {
+#     type             = "forward"
+#     target_group_arn = aws_lb_target_group.lb_target_group_2.arn
+#   }
+# }
 
 resource "aws_iam_role" "CodeDeployLambdaServiceRole" {
   name           = "CodeDeployLambdaServiceRole"
@@ -905,6 +905,10 @@ resource "aws_iam_role_policy_attachment" "dynamo_policy_attach_role" {
   role       = "${aws_iam_role.CodeDeployLambdaServiceRole.name}"
   policy_arn = "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
 }
+resource "aws_iam_role_policy_attachment" "ses_policy_attach_role" {
+  role       = "${aws_iam_role.CodeDeployLambdaServiceRole.name}"
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSESFullAccess"
+}
 resource "aws_iam_role_policy_attachment" "lambda_policy_attach_predefinedrole1" {
   role       = "${aws_iam_role.EC2_CSYE6225.name}"
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
@@ -930,7 +934,38 @@ resource "aws_iam_role_policy_attachment" "dynamo_policy_attach_role1" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
 }
 
-resource "aws_iam_role_policy_attachment" "ses_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSESFullAccess"
-  role = "${aws_iam_role.CodeDeployLambdaServiceRole.name}"
+resource "aws_lb_listener" "https_access" {
+  load_balancer_arn = aws_lb.LoadBalancer.arn
+  port              = "443"
+  protocol          = "HTTPS"
+  certificate_arn = var.certificateARN
+  ssl_policy="ELBSecurityPolicy-2016-08"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.lb_target_group_2.arn
+  }
+}
+
+# resource "aws_lb_listener" "back_end" {
+#   load_balancer_arn = aws_lb.LoadBalancer.arn
+#   port              = "80"
+#   protocol          = "HTTP"
+#   default_action {
+#     type             = "redirect"
+#     redirect{
+#       port="443"
+#       protocol="HTTPS"
+#       status_code="HTTP_301"
+#     }
+#   }
+# }
+resource "aws_lb_listener" "back_end" {
+  load_balancer_arn = aws_lb.LoadBalancer.arn
+  port              = "8080"
+  protocol          = "HTTPS"
+  certificate_arn = var.certificateARN
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.lb_target_group_2.arn
+  }
 }
